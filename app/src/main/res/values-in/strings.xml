@@ -22,6 +22,7 @@
     <string name="theme_dark">gelap</string>
     <string name="theme_light">terang</string>
     <string name="haptics">Getar saat tombol ditekan</string>
+    <string name="auto_cap">Huruf kapital otomatis di awal kalimat</string>
 
     <string name="privacy_note">Tanpa izin internet. Apa pun yang kamu ketik tidak pernah keluar dari HP ini.</string>
     <string name="privacy_details">0 izin · tanpa internet · tanpa backup · mode privat di kolom password</string>
