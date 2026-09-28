@@ -92,35 +92,14 @@ class SettingsActivity : Activity() {
 
         // ---- feel ----
         root.addView(section(getString(R.string.section_feel)), lp(32))
-        val hapticsRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = pillBg(palette.key)
-            setPadding(dp(20), dp(8), dp(8), dp(8))
-        }
-        hapticsRow.addView(
-            text(getString(R.string.haptics), 15f, palette.text),
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        root.addView(
+            toggleRow(getString(R.string.haptics), { prefs.haptics }, { prefs.haptics = it }),
+            lp(12)
         )
-        val toggle = TextView(this).apply {
-            gravity = Gravity.CENTER
-            textSize = 13f
-            typeface = dotFont
-            setPadding(0, dp(8), 0, dp(8))
-        }
-        fun paintToggle() {
-            val on = prefs.haptics
-            toggle.text = if (on) "on" else "off"
-            toggle.setTextColor(if (on) Color.WHITE else palette.hint)
-            toggle.background = pillBg(if (on) palette.accent else palette.special)
-        }
-        paintToggle()
-        hapticsRow.setOnClickListener {
-            prefs.haptics = !prefs.haptics
-            paintToggle()
-        }
-        hapticsRow.addView(toggle, LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT))
-        root.addView(hapticsRow, lp(12))
+        root.addView(
+            toggleRow(getString(R.string.auto_cap), { prefs.autoCap }, { prefs.autoCap = it }),
+            lp(10)
+        )
 
         // ---- privacy ----
         root.addView(section(getString(R.string.section_privacy)), lp(32))
@@ -231,6 +210,41 @@ class SettingsActivity : Activity() {
             setPadding(dp(20), dp(15), dp(20), dp(15))
             setOnClickListener { onClick() }
         }
+
+    /** A pill row with a label on the left and an on/off switch on the right. */
+    private fun toggleRow(label: String, get: () -> Boolean, set: (Boolean) -> Unit): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = pillBg(palette.key)
+            setPadding(dp(20), dp(8), dp(8), dp(8))
+        }
+        row.addView(
+            text(label, 15f, palette.text),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        val toggle = TextView(this).apply {
+            gravity = Gravity.CENTER
+            textSize = 13f
+            typeface = dotFont
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        fun paint() {
+            val on = get()
+            toggle.text = if (on) "on" else "off"
+            toggle.setTextColor(if (on) Color.WHITE else palette.hint)
+            toggle.background = pillBg(if (on) palette.accent else palette.special)
+        }
+        paint()
+        row.setOnClickListener {
+            set(!get())
+            paint()
+        }
+        row.addView(toggle, LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            marginStart = dp(12)
+        })
+        return row
+    }
 
     private fun refresh() {
         val enabled = imm().enabledInputMethodList.any { it.packageName == packageName }
