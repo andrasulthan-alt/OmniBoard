@@ -24,6 +24,7 @@ object Codes {
     const val SPACE = -4
     const val SYMBOLS = -5
     const val LETTERS = -6
+    const val EMOJI = -7
 }
 
 enum class Shift { OFF, ONCE, LOCKED }
@@ -51,8 +52,9 @@ object Layouts {
 
     private fun bottom(label: String, code: Int): List<Key> = listOf(
         Key(label, code, weight = 1.5f),
+        Key("emoji", Codes.EMOJI),
         Key(",", Codes.TEXT),
-        Key("space", Codes.SPACE, text = " ", weight = 5f),
+        Key("space", Codes.SPACE, text = " ", weight = 4f),
         Key(".", Codes.TEXT, longPress = "?"),
         Key("enter", Codes.ENTER, weight = 1.5f),
     )
@@ -123,6 +125,7 @@ class KeyboardView(context: Context) : View(context) {
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
+    private val arcRect = RectF()
 
     private val timer = Handler(Looper.getMainLooper())
     private var downKey: Key? = null
@@ -226,6 +229,7 @@ class KeyboardView(context: Context) : View(context) {
                 Codes.DELETE -> drawBackspace(canvas, k)
                 Codes.ENTER -> drawEnter(canvas, k)
                 Codes.SPACE -> drawSpace(canvas, k)
+                Codes.EMOJI -> drawEmojiKey(canvas, k)
                 else -> drawLabel(canvas, k)
             }
 
@@ -288,6 +292,20 @@ class KeyboardView(context: Context) : View(context) {
         path.lineTo(cx - s * 0.02f, cy + s * 0.15f)
         iconPaint.color = palette.text
         canvas.drawPath(path, iconPaint)
+    }
+
+    private fun drawEmojiKey(canvas: Canvas, k: Key) {
+        val cx = k.rect.centerX()
+        val cy = k.rect.centerY()
+        val s = iconSize(k)
+        iconPaint.color = palette.text
+        canvas.drawCircle(cx, cy, s * 0.5f, iconPaint)
+        dotPaint.color = palette.text
+        dotPaint.style = Paint.Style.FILL
+        canvas.drawCircle(cx - s * 0.17f, cy - s * 0.1f, s * 0.06f, dotPaint)
+        canvas.drawCircle(cx + s * 0.17f, cy - s * 0.1f, s * 0.06f, dotPaint)
+        arcRect.set(cx - s * 0.25f, cy - s * 0.18f, cx + s * 0.25f, cy + s * 0.28f)
+        canvas.drawArc(arcRect, 20f, 140f, false, iconPaint)
     }
 
     private fun drawEnter(canvas: Canvas, k: Key) {
