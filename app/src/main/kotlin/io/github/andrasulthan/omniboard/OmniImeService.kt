@@ -6,16 +6,19 @@ import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
+import android.widget.FrameLayout
 
-class OmniImeService : InputMethodService(), KeyboardView.Listener {
+class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Listener {
 
     private var keyboard: KeyboardView? = null
+    private var emojiPanel: EmojiView? = null
     private var lastShiftTap = 0L
 
-    /** True for passwords and fields that ask us not to learn. No learning, no suggestions here. */
+    /** True for passwords and fields that ask us not to learn. No learning, no history here. */
     private var privateField = false
 
     /** User setting: capitalize the first letter of a sentence automatically. */
@@ -27,14 +30,23 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onCreateInputView(): View {
-        val view = KeyboardView(this)
-        view.listener = this
-        keyboard = view
-        return view
+        val kb = KeyboardView(this)
+        kb.listener = this
+        val ev = EmojiView(this, this)
+        ev.visibility = View.GONE
+        keyboard = kb
+        emojiPanel = ev
+        return FrameLayout(this).apply {
+            addView(kb, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(ev, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        hideEmoji()
         val view = keyboard ?: return
         val prefs = Prefs(this)
         view.hapticsEnabled = prefs.haptics
@@ -57,8 +69,54 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        hideEmoji()
         keyboard?.reset()
     }
+
+    // ---------- emoji panel ----------
+
+    private fun showEmoji() {
+        val kb = keyboard ?: return
+        val ev = emojiPanel ?: return
+        val prefs = Prefs(this)
+        ev.hapticsEnabled = prefs.haptics
+        ev.setPalette(if (prefs.isDark(this)) Palette.DARK else Palette.LIGHT)
+        ev.setPadding(0, 0, 0, kb.paddingBottom)
+        // Same height as the keyboard, so nothing jumps when switching.
+        ev.layoutParams = ev.layoutParams.apply { height = kb.height }
+        ev.show(if (privateField) emptyList() else prefs.recentEmojis)
+        ev.visibility = View.VISIBLE
+        kb.visibility = View.INVISIBLE
+        kb.reset()
+    }
+
+    private fun hideEmoji() {
+        emojiPanel?.let {
+            it.reset()
+            it.visibility = View.GONE
+        }
+        keyboard?.visibility = View.VISIBLE
+    }
+
+    override fun onEmoji(emoji: String) {
+        currentInputConnection?.commitText(emoji, 1)
+        if (!privateField) Prefs(this).addRecentEmoji(emoji)
+    }
+
+    override fun onEmojiDelete() {
+        currentInputConnection?.let { deleteOne(it) }
+    }
+
+    override fun onEmojiSpace() {
+        currentInputConnection?.commitText(" ", 1)
+    }
+
+    override fun onEmojiBack() {
+        hideEmoji()
+        updateAutoCap()
+    }
+
+    // ---------- keyboard ----------
 
     private fun isPrivateField(info: EditorInfo): Boolean {
         val cls = info.inputType and InputType.TYPE_MASK_CLASS
@@ -140,6 +198,7 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
             Codes.SHIFT -> toggleShift(view)
             Codes.SYMBOLS -> view.showSymbols()
             Codes.LETTERS -> { view.showLetters(); updateAutoCap() }
+            Codes.EMOJI -> showEmoji()
         }
     }
 
