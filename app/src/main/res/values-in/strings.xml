@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OmniBoard</string>
+    <string name="ime_name">OmniBoard</string>
+    <string name="subtype_en">Inggris (AS)</string>
+    <string name="subtype_id">Indonesia</string>
+
+    <string name="section_setup">pengaturan awal</string>
+    <string name="section_look">tampilan</string>
+    <string name="section_feel">rasa</string>
+    <string name="section_privacy">privasi</string>
+
+    <string name="step_enable">1. Aktifkan OmniBoard</string>
+    <string name="step_choose">2. Ganti ke OmniBoard</string>
+    <string name="test_hint">Ketik di sini untuk mencoba</string>
+
+    <string name="status_disabled">OmniBoard belum diaktifkan.</string>
+    <string name="status_enabled">OmniBoard sudah aktif tapi belum dipilih.</string>
+    <string name="status_active">OmniBoard adalah keyboard yang sedang dipakai.</string>
+
+    <string name="theme_system">ikuti sistem</string>
+    <string name="theme_dark">gelap</string>
+    <string name="theme_light">terang</string>
+    <string name="haptics">Getar saat tombol ditekan</string>
+
+    <string name="privacy_note">Tanpa izin internet. Apa pun yang kamu ketik tidak pernah keluar dari HP ini.</string>
+    <string name="privacy_details">0 izin · tanpa internet · tanpa backup · mode privat di kolom password</string>
+
+    <string name="last_crash">Crash terakhir (hanya tersimpan di HP ini):</string>
+    <string name="clear">Hapus</string>
+</resources>
