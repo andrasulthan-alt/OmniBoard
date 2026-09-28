@@ -22,6 +22,7 @@
     <string name="theme_dark">dark</string>
     <string name="theme_light">light</string>
     <string name="haptics">Vibrate on key press</string>
+    <string name="auto_cap">Auto-capitalize sentences</string>
 
     <string name="privacy_note">No internet permission. What you type never leaves this phone.</string>
     <string name="privacy_details">0 permissions · no internet · no backup · private mode in password fields</string>
