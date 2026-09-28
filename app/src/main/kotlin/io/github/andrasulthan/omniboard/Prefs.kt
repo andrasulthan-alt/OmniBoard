@@ -11,6 +11,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("haptics", true)
         set(value) = sp.edit().putBoolean("haptics", value).apply()
 
+    var autoCap: Boolean
+        get() = sp.getBoolean("auto_cap", true)
+        set(value) = sp.edit().putBoolean("auto_cap", value).apply()
+
     var theme: String
         get() = sp.getString("theme", "system") ?: "system"
         set(value) = sp.edit().putString("theme", value).apply()
