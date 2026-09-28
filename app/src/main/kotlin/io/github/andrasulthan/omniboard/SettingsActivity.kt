@@ -37,6 +37,8 @@ class SettingsActivity : Activity() {
         dotFont = DotFont.get(this)
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // Default spacing; replaced by the insets listener on edge-to-edge devices.
+        root.setPadding(dp(24), dp(24), dp(24), dp(32))
 
         // ---- header ----
         root.addView(text(getString(R.string.app_name), 40f, palette.text, dotFont))
