@@ -19,6 +19,15 @@ class Prefs(context: Context) {
         get() = sp.getString("theme", "system") ?: "system"
         set(value) = sp.edit().putString("theme", value).apply()
 
+    /** Recently used emoji, newest first. Stored only on this phone (backup is disabled). */
+    var recentEmojis: List<String>
+        get() = (sp.getString("recent_emojis", "") ?: "").split("\n").filter { it.isNotEmpty() }
+        set(value) = sp.edit().putString("recent_emojis", value.joinToString("\n")).apply()
+
+    fun addRecentEmoji(emoji: String) {
+        recentEmojis = (listOf(emoji) + recentEmojis.filter { it != emoji }).take(32)
+    }
+
     fun isDark(context: Context): Boolean = when (theme) {
         "dark" -> true
         "light" -> false
