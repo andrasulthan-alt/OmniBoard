@@ -18,6 +18,9 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
     /** True for passwords and fields that ask us not to learn. No learning, no suggestions here. */
     private var privateField = false
 
+    /** User setting: capitalize the first letter of a sentence automatically. */
+    private var autoCapEnabled = true
+
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
@@ -36,6 +39,7 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
         val prefs = Prefs(this)
         view.hapticsEnabled = prefs.haptics
         view.setDark(prefs.isDark(this))
+        autoCapEnabled = prefs.autoCap
 
         privateField = isPrivateField(info)
         view.incognito = privateField
@@ -92,7 +96,8 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener {
         val view = keyboard ?: return
         if (view.shift == Shift.LOCKED) return
         val info = currentInputEditorInfo ?: return
-        val caps = (currentInputConnection?.getCursorCapsMode(info.inputType) ?: 0) != 0
+        val caps = autoCapEnabled &&
+            (currentInputConnection?.getCursorCapsMode(info.inputType) ?: 0) != 0
         view.shift = if (!view.isSymbols && caps) Shift.ONCE else Shift.OFF
     }
 
