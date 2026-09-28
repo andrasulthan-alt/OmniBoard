@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OmniBoard</string>
+    <string name="ime_name">OmniBoard</string>
+    <string name="subtype_en">English (US)</string>
+    <string name="subtype_id">Indonesian</string>
+
+    <string name="section_setup">setup</string>
+    <string name="section_look">look</string>
+    <string name="section_feel">feel</string>
+    <string name="section_privacy">privacy</string>
+
+    <string name="step_enable">1. Enable OmniBoard</string>
+    <string name="step_choose">2. Switch to OmniBoard</string>
+    <string name="test_hint">Type here to test</string>
+
+    <string name="status_disabled">OmniBoard is not enabled yet.</string>
+    <string name="status_enabled">OmniBoard is enabled but not selected.</string>
+    <string name="status_active">OmniBoard is your current keyboard.</string>
+
+    <string name="theme_system">system</string>
+    <string name="theme_dark">dark</string>
+    <string name="theme_light">light</string>
+    <string name="haptics">Vibrate on key press</string>
+
+    <string name="privacy_note">No internet permission. What you type never leaves this phone.</string>
+    <string name="privacy_details">0 permissions · no internet · no backup · private mode in password fields</string>
+
+    <string name="last_crash">Last crash (stored only on this phone):</string>
+    <string name="clear">Clear</string>
+</resources>
