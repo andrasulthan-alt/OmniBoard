@@ -1,5 +1,6 @@
 package io.github.andrasulthan.omniboard
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -12,9 +13,11 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
+import kotlin.math.abs
 
 object Codes {
     const val TEXT = 0
@@ -80,6 +83,8 @@ class KeyboardView(context: Context) : View(context) {
     interface Listener {
         fun onKey(key: Key)
         fun onLongPress(key: Key): Boolean
+        /** Space-bar trackpad: move the text cursor one step (DPAD key code). */
+        fun onCursorStep(keyCode: Int) {}
     }
 
     var listener: Listener? = null
@@ -132,6 +137,21 @@ class KeyboardView(context: Context) : View(context) {
     private var activeId = -1
     private var longPressFired = false
 
+    // Finger positions, used by the space-bar trackpad.
+    private var downX = 0f
+    private var downY = 0f
+    private var lastX = 0f
+    private var lastY = 0f
+
+    // Space-bar trackpad state.
+    private var trackpad = false
+    private var trackX = 0f
+    private var trackY = 0f
+
+    // Labels fade out while the trackpad is active and fade back in afterwards.
+    private var labelAlpha = 1f
+    private var fadeAnim: ValueAnimator? = null
+
     private val repeatRunnable = object : Runnable {
         override fun run() {
             val k = downKey ?: return
@@ -142,6 +162,10 @@ class KeyboardView(context: Context) : View(context) {
 
     private val longPressRunnable = Runnable {
         val k = downKey ?: return@Runnable
+        if (k.code == Codes.SPACE) {
+            enterTrackpad(lastX, lastY)
+            return@Runnable
+        }
         if (listener?.onLongPress(k) == true) {
             longPressFired = true
             if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
@@ -173,8 +197,11 @@ class KeyboardView(context: Context) : View(context) {
 
     fun reset() {
         timer.removeCallbacksAndMessages(null)
+        fadeAnim?.cancel()
+        labelAlpha = 1f
         downKey = null
         activeId = -1
+        trackpad = false
         invalidate()
     }
 
@@ -209,14 +236,16 @@ class KeyboardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(palette.background)
         for (row in rows) for (k in row) {
-            val isDown = k === downKey
             val pill = k.code == Codes.SPACE || k.code == Codes.ENTER
             val r = if (pill) k.rect.height() / 2f else radius
+            val isDown = k === downKey && !trackpad
 
             canvas.save()
             if (isDown) canvas.scale(0.94f, 0.94f, k.rect.centerX(), k.rect.centerY())
 
+            // Keys stay visible as shapes; in trackpad mode they all turn the same grey.
             keyPaint.color = when {
+                trackpad -> palette.key
                 k.code == Codes.ENTER -> palette.accent
                 isDown -> palette.pressedKey
                 k.code == Codes.TEXT || k.code == Codes.SPACE -> palette.key
@@ -224,18 +253,24 @@ class KeyboardView(context: Context) : View(context) {
             }
             canvas.drawRoundRect(k.rect, r, r, keyPaint)
 
-            when (k.code) {
-                Codes.SHIFT -> drawShift(canvas, k)
-                Codes.DELETE -> drawBackspace(canvas, k)
-                Codes.ENTER -> drawEnter(canvas, k)
-                Codes.SPACE -> drawSpace(canvas, k)
-                Codes.EMOJI -> drawEmojiKey(canvas, k)
-                else -> drawLabel(canvas, k)
-            }
+            if (labelAlpha > 0.01f) {
+                val fading = labelAlpha < 0.99f
+                if (fading) canvas.saveLayerAlpha(k.rect, (labelAlpha * 255).toInt())
 
-            k.longPress?.let {
-                hintPaint.color = palette.hint
-                canvas.drawText(it, k.rect.right - dp(6f), k.rect.top + dp(13f), hintPaint)
+                when (k.code) {
+                    Codes.SHIFT -> drawShift(canvas, k)
+                    Codes.DELETE -> drawBackspace(canvas, k)
+                    Codes.ENTER -> drawEnter(canvas, k)
+                    Codes.SPACE -> drawSpace(canvas, k)
+                    Codes.EMOJI -> drawEmojiKey(canvas, k)
+                    else -> drawLabel(canvas, k)
+                }
+                k.longPress?.let {
+                    hintPaint.color = palette.hint
+                    canvas.drawText(it, k.rect.right - dp(6f), k.rect.top + dp(13f), hintPaint)
+                }
+
+                if (fading) canvas.restore()
             }
             canvas.restore()
         }
@@ -371,6 +406,51 @@ class KeyboardView(context: Context) : View(context) {
         canvas.drawText(label, startX + 2 * r + between + textW / 2f, y, textPaint)
     }
 
+    // ---------- space-bar trackpad ----------
+
+    private fun fadeLabels(to: Float) {
+        fadeAnim?.cancel()
+        fadeAnim = ValueAnimator.ofFloat(labelAlpha, to).apply {
+            duration = 160
+            addUpdateListener {
+                labelAlpha = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun enterTrackpad(x: Float, y: Float) {
+        timer.removeCallbacks(longPressRunnable)
+        trackpad = true
+        longPressFired = true
+        trackX = x
+        trackY = y
+        if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        fadeLabels(0f)
+        invalidate()
+    }
+
+    private fun exitTrackpad() {
+        trackpad = false
+        fadeLabels(1f)
+        invalidate()
+    }
+
+    private fun moveTrackpad(x: Float, y: Float) {
+        val stepX = dp(9f)
+        val stepY = dp(24f)
+        while (x - trackX >= stepX) { trackX += stepX; cursorStep(KeyEvent.KEYCODE_DPAD_RIGHT) }
+        while (trackX - x >= stepX) { trackX -= stepX; cursorStep(KeyEvent.KEYCODE_DPAD_LEFT) }
+        while (y - trackY >= stepY) { trackY += stepY; cursorStep(KeyEvent.KEYCODE_DPAD_DOWN) }
+        while (trackY - y >= stepY) { trackY -= stepY; cursorStep(KeyEvent.KEYCODE_DPAD_UP) }
+    }
+
+    private fun cursorStep(keyCode: Int) {
+        listener?.onCursorStep(keyCode)
+        if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+    }
+
     // ---------- touch ----------
 
     private fun findKey(x: Float, y: Float): Key? {
@@ -398,6 +478,10 @@ class KeyboardView(context: Context) : View(context) {
         downKey = k
         activeId = id
         longPressFired = false
+        downX = x
+        downY = y
+        lastX = x
+        lastY = y
         if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         if (k.repeatable) {
             listener?.onKey(k)
@@ -409,7 +493,18 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun slide(x: Float, y: Float) {
+        lastX = x
+        lastY = y
+        if (trackpad) {
+            moveTrackpad(x, y)
+            return
+        }
         val current = downKey ?: return
+        // Swipe sideways on the space bar: start the trackpad right away.
+        if (current.code == Codes.SPACE && !longPressFired && abs(x - downX) > dp(16f)) {
+            enterTrackpad(x, y)
+            return
+        }
         if (current.repeatable || longPressFired) return
         val k = findKey(x, y)
         if (k !== current) {
@@ -423,6 +518,12 @@ class KeyboardView(context: Context) : View(context) {
     private fun release(commit: Boolean) {
         timer.removeCallbacks(repeatRunnable)
         timer.removeCallbacks(longPressRunnable)
+        if (trackpad) {
+            downKey = null
+            activeId = -1
+            exitTrackpad()
+            return
+        }
         val k = downKey
         if (commit && k != null && !k.repeatable && !longPressFired) listener?.onKey(k)
         downKey = null
