@@ -116,6 +116,13 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
         updateAutoCap()
     }
 
+    // ---------- space-bar trackpad ----------
+
+    override fun onCursorStep(keyCode: Int) {
+        sendDownUpKeyEvents(keyCode)
+        updateAutoCap()
+    }
+
     // ---------- keyboard ----------
 
     private fun isPrivateField(info: EditorInfo): Boolean {
@@ -203,8 +210,9 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
     }
 
     override fun onLongPress(key: Key): Boolean {
-        // Hold space: open the keyboard picker (emergency way back to another keyboard).
-        if (key.code == Codes.SPACE) {
+        // Hold the emoji key: open the keyboard picker (way back to another keyboard).
+        // Holding space is used for the trackpad, handled inside KeyboardView.
+        if (key.code == Codes.EMOJI) {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showInputMethodPicker()
             return true
