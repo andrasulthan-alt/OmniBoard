@@ -8,9 +8,11 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
+import kotlin.math.abs
 
 class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Listener {
 
@@ -23,6 +25,17 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
 
     /** User setting: capitalize the first letter of a sentence automatically. */
     private var autoCapEnabled = true
+
+    /** Latest cursor position reported by the app (used after moving up/down a line). */
+    private var selEnd = -1
+
+    // Space-bar trackpad state.
+    private var tpAnchor = -1          // cursor position when the trackpad started, -1 = use arrow keys
+    private var tpMax = Int.MAX_VALUE  // end of the text
+    private var tpBaseX = 0
+    private var tpLastX = 0
+    private var tpLastY = 0
+    private var tpReanchor = false
 
     override fun onCreate() {
         super.onCreate()
@@ -47,6 +60,7 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         hideEmoji()
+        selEnd = info.initialSelEnd
         val view = keyboard ?: return
         val prefs = Prefs(this)
         view.hapticsEnabled = prefs.haptics
@@ -71,6 +85,15 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
         super.onFinishInputView(finishingInput)
         hideEmoji()
         keyboard?.reset()
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        selEnd = newSelEnd
     }
 
     // ---------- emoji panel ----------
@@ -118,8 +141,62 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
 
     // ---------- space-bar trackpad ----------
 
-    override fun onCursorStep(keyCode: Int) {
-        sendDownUpKeyEvents(keyCode)
+    override fun onTrackpadStart() {
+        tpBaseX = 0
+        tpLastX = 0
+        tpLastY = 0
+        tpReanchor = false
+        readAnchor()
+    }
+
+    /** Remember where the cursor is. In password fields we never read the text: arrow keys only. */
+    private fun readAnchor() {
+        tpAnchor = -1
+        if (privateField) return
+        val et = currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0) ?: return
+        val text = et.text ?: return
+        tpAnchor = et.startOffset + et.selectionEnd
+        tpMax = et.startOffset + text.length
+    }
+
+    override fun onTrackpadMove(stepsX: Int, stepsY: Int) {
+        val ic = currentInputConnection ?: return
+
+        // Up / down: move by lines with arrow keys, then continue from the new spot.
+        if (stepsY != tpLastY) {
+            val d = stepsY - tpLastY
+            repeat(abs(d)) {
+                sendDownUpKeyEvents(if (d > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP)
+            }
+            tpLastY = stepsY
+            tpBaseX = stepsX
+            tpLastX = stepsX
+            if (tpAnchor >= 0) tpReanchor = true
+            return
+        }
+
+        // Left / right.
+        if (stepsX == tpLastX) return
+        if (tpAnchor >= 0) {
+            if (tpReanchor && selEnd >= 0) {
+                tpAnchor = selEnd
+                tpReanchor = false
+            }
+            val raw = tpAnchor + (stepsX - tpBaseX)
+            val target = raw.coerceIn(0, tpMax)
+            // At the start or end of the text: moving back works immediately.
+            if (target != raw) tpBaseX += raw - target
+            ic.setSelection(target, target)
+        } else {
+            val d = stepsX - tpLastX
+            repeat(abs(d)) {
+                sendDownUpKeyEvents(if (d > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
+            }
+        }
+        tpLastX = stepsX
+    }
+
+    override fun onTrackpadEnd() {
         updateAutoCap()
     }
 
