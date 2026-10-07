@@ -13,7 +13,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -83,8 +82,14 @@ class KeyboardView(context: Context) : View(context) {
     interface Listener {
         fun onKey(key: Key)
         fun onLongPress(key: Key): Boolean
-        /** Space-bar trackpad: move the text cursor one step (DPAD key code). */
+        /** Old trackpad callback, kept so older code still compiles. */
         fun onCursorStep(keyCode: Int) {}
+        /** Space-bar trackpad started. */
+        fun onTrackpadStart() {}
+        /** Steps moved since the trackpad started (x = letters, y = lines). */
+        fun onTrackpadMove(stepsX: Int, stepsY: Int) {}
+        /** Space-bar trackpad finished. */
+        fun onTrackpadEnd() {}
     }
 
     var listener: Listener? = null
@@ -139,14 +144,15 @@ class KeyboardView(context: Context) : View(context) {
 
     // Finger positions, used by the space-bar trackpad.
     private var downX = 0f
-    private var downY = 0f
     private var lastX = 0f
     private var lastY = 0f
 
     // Space-bar trackpad state.
     private var trackpad = false
-    private var trackX = 0f
-    private var trackY = 0f
+    private var trackStartX = 0f
+    private var trackStartY = 0f
+    private var lastStepsX = 0
+    private var lastStepsY = 0
 
     // Labels fade out while the trackpad is active and fade back in afterwards.
     private var labelAlpha = 1f
@@ -411,7 +417,7 @@ class KeyboardView(context: Context) : View(context) {
     private fun fadeLabels(to: Float) {
         fadeAnim?.cancel()
         fadeAnim = ValueAnimator.ofFloat(labelAlpha, to).apply {
-            duration = 160
+            duration = 180
             addUpdateListener {
                 labelAlpha = it.animatedValue as Float
                 invalidate()
@@ -424,31 +430,33 @@ class KeyboardView(context: Context) : View(context) {
         timer.removeCallbacks(longPressRunnable)
         trackpad = true
         longPressFired = true
-        trackX = x
-        trackY = y
+        trackStartX = x
+        trackStartY = y
+        lastStepsX = 0
+        lastStepsY = 0
+        // One haptic when the trackpad starts, none while moving (smoother, like iPhone).
         if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        listener?.onTrackpadStart()
         fadeLabels(0f)
         invalidate()
     }
 
     private fun exitTrackpad() {
         trackpad = false
+        listener?.onTrackpadEnd()
         fadeLabels(1f)
         invalidate()
     }
 
     private fun moveTrackpad(x: Float, y: Float) {
-        val stepX = dp(9f)
-        val stepY = dp(24f)
-        while (x - trackX >= stepX) { trackX += stepX; cursorStep(KeyEvent.KEYCODE_DPAD_RIGHT) }
-        while (trackX - x >= stepX) { trackX -= stepX; cursorStep(KeyEvent.KEYCODE_DPAD_LEFT) }
-        while (y - trackY >= stepY) { trackY += stepY; cursorStep(KeyEvent.KEYCODE_DPAD_DOWN) }
-        while (trackY - y >= stepY) { trackY -= stepY; cursorStep(KeyEvent.KEYCODE_DPAD_UP) }
-    }
-
-    private fun cursorStep(keyCode: Int) {
-        listener?.onCursorStep(keyCode)
-        if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        // Position-based: the cursor follows the finger, so moving back is exact.
+        val stepsX = ((x - trackStartX) / dp(8f)).toInt()
+        val stepsY = ((y - trackStartY) / dp(26f)).toInt()
+        if (stepsX != lastStepsX || stepsY != lastStepsY) {
+            lastStepsX = stepsX
+            lastStepsY = stepsY
+            listener?.onTrackpadMove(stepsX, stepsY)
+        }
     }
 
     // ---------- touch ----------
@@ -479,7 +487,6 @@ class KeyboardView(context: Context) : View(context) {
         activeId = id
         longPressFired = false
         downX = x
-        downY = y
         lastX = x
         lastY = y
         if (hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -487,7 +494,8 @@ class KeyboardView(context: Context) : View(context) {
             listener?.onKey(k)
             timer.postDelayed(repeatRunnable, 400)
         } else {
-            timer.postDelayed(longPressRunnable, 350)
+            // The space bar starts the trackpad a bit faster than other long-presses.
+            timer.postDelayed(longPressRunnable, if (k.code == Codes.SPACE) 250L else 350L)
         }
         invalidate()
     }
@@ -501,7 +509,7 @@ class KeyboardView(context: Context) : View(context) {
         }
         val current = downKey ?: return
         // Swipe sideways on the space bar: start the trackpad right away.
-        if (current.code == Codes.SPACE && !longPressFired && abs(x - downX) > dp(16f)) {
+        if (current.code == Codes.SPACE && !longPressFired && abs(x - downX) > dp(12f)) {
             enterTrackpad(x, y)
             return
         }
