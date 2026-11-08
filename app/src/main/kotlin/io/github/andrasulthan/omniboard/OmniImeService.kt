@@ -283,6 +283,7 @@ class OmniImeService : InputMethodService(), KeyboardView.Listener, EmojiView.Li
             Codes.SYMBOLS -> view.showSymbols()
             Codes.LETTERS -> { view.showLetters(); updateAutoCap() }
             Codes.EMOJI -> showEmoji()
+            Codes.MORE_SYMBOLS -> view.showMoreSymbols()
         }
     }
 
