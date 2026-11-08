@@ -27,6 +27,7 @@ object Codes {
     const val SYMBOLS = -5
     const val LETTERS = -6
     const val EMOJI = -7
+    const val MORE_SYMBOLS = -8
 }
 
 enum class Shift { OFF, ONCE, LOCKED }
@@ -45,9 +46,11 @@ class Key(
 }
 
 object Layouts {
+    /** One key per character. A space in [longs] means "no long-press" for that key. */
     private fun row(chars: String, longs: String?): List<Key> =
         chars.mapIndexed { i, c ->
-            Key(c.toString(), Codes.TEXT, c.toString(), 1f, longs?.getOrNull(i)?.toString())
+            val alt = longs?.getOrNull(i)?.takeIf { it != ' ' }?.toString()
+            Key(c.toString(), Codes.TEXT, c.toString(), 1f, alt)
         }
 
     private fun delete() = Key("del", Codes.DELETE, weight = 1.5f, repeatable = true)
@@ -69,10 +72,21 @@ object Layouts {
         bottom("?123", Codes.SYMBOLS),
     )
 
+    /** First symbols page. Hold + for =, hold - for _. */
     fun symbols(): List<List<Key>> = listOf(
         row("1234567890", null),
-        row("@#\$%&-+()/", null),
-        listOf(Key("_", Codes.TEXT, weight = 1.5f)) + row("*\"':;!?", null) + delete(),
+        row("@#\$%&-+()/", "     _=   "),
+        listOf(Key("=\\<", Codes.MORE_SYMBOLS, weight = 1.5f)) +
+            row("*\"':;!?", null) + delete(),
+        bottom("abc", Codes.LETTERS),
+    )
+
+    /** Second symbols page: = and the less common symbols. */
+    fun moreSymbols(): List<List<Key>> = listOf(
+        row("~`|•√π÷×{}", null),
+        row("£€¥^°=_[]\\", null),
+        listOf(Key("?123", Codes.SYMBOLS, weight = 1.5f)) +
+            row("<>©®™✓§", null) + delete(),
         bottom("abc", Codes.LETTERS),
     )
 }
@@ -198,6 +212,7 @@ class KeyboardView(context: Context) : View(context) {
 
     fun showLetters() { rows = Layouts.letters(); isSymbols = false; layoutKeys(); invalidate() }
     fun showSymbols() { rows = Layouts.symbols(); isSymbols = true; layoutKeys(); invalidate() }
+    fun showMoreSymbols() { rows = Layouts.moreSymbols(); isSymbols = true; layoutKeys(); invalidate() }
     fun setEnterIcon(icon: EnterIcon) { enterIcon = icon; invalidate() }
     fun setDark(dark: Boolean) { palette = if (dark) Palette.DARK else Palette.LIGHT; invalidate() }
 
